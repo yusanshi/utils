@@ -6,7 +6,6 @@
 # execute `cd /path/to/foo/bar && git add . && git diff --cached > ../bar.patch`
 # So patch for it would be located in /path/to/foo/bar.patch
 
-
 if [ "$1" = "-h" -o "$1" = "--help" ]; then
     echo "Generate patches for all submodules."
     echo ""
@@ -23,19 +22,26 @@ fi
 wd=$(pwd)
 for i in $(git submodule foreach --quiet 'echo $path'); do
     cd "$wd"/"$i"
-    git add .
-    if [ "$1" = "-m" -o "$1" = "--manual" ]; then
-        read -p "Add binary files for submodule $i? [yN]" choice
-        case $choice in
-        [Yy]*) diff=$(git diff --cached --binary) ;;
-        *) diff=$(git diff --cached) ;;
-        esac
-    else
-        diff=$(git diff --cached)
-    fi
-    if [[ -n $diff ]]; then
+    if [[ $(git status --porcelain) ]]; then
+        git add .
         patch=${PWD##*/}.patch
-        echo "$diff" >../"$patch"
+        if [ "$1" = "-m" -o "$1" = "--manual" ]; then
+            read -p "Add binary files for submodule $i? [yN]" choice
+            case $choice in
+            [Yy]*)
+                echo "$(git diff --cached --binary)" >../"$patch"
+                # Add a \n in the end as it will be missed using above line.
+                echo "" >>../"$patch"
+                ;;
+            *)
+                echo "$(git diff --cached)" >../"$patch"
+                ;;
+            esac
+        else
+            echo "$(git diff --cached)" >../"$patch"
+        fi
         echo "Patch file $patch generated"
+    else
+        echo "No change for submodule $i. Skipped."
     fi
 done
